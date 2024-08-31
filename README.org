@@ -1,3 +1,15 @@
 #+title: IC Testnet with Multiple Nodes
 
+* Running ic-testnet
++ Firstly, set an alias =ic-testnet= for convenience.
++ Then, you can use =ic-testnet= as a binary.
+#+begin_src sh
+  alias ic-testnet="cargo run --bin ic-testnet --"
+  ic-testnet --help
+#+end_src
+
+* Replica version
++ Replica version depends on the version of =ic= which is ported as submodule.
+  + Currently, =0.9.0= is used as default replica verison.
+
 
