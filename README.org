@@ -1,11 +1,18 @@
 #+title: IC Testnet with Multiple Nodes
 
 * Running ic-testnet
+** Generating node configs
 + Firstly, set an alias =ic-testnet= for convenience.
 + Then, you can use =ic-testnet= as a binary.
 #+begin_src sh
   alias ic-testnet="cargo run --bin ic-testnet --"
-  ic-testnet --help
+  ic-testnet ## It generates configs for 4 nodes
+#+end_src
+
+** Running replica
+#+begin_src sh
+  cd ic
+  cargo run --bin ic-replica -- --config-file ../tmp/state-100/ic.json5
 #+end_src
 
 * Replica version
