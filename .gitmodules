@@ -1,0 +1,3 @@
+[submodule "ic"]
+	path = ic
+	url = git@github.com:dfinity/ic.git
