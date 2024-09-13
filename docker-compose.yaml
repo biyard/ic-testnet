@@ -1,0 +1,55 @@
+version: "3"
+
+services:
+  node1:
+    container_name: node1
+    build: .
+    restart: always
+    working_dir: $PWD
+    command: sleep 24h
+    volumes:
+      - .:$PWD
+    networks:
+      vpcbr:
+        ipv4_address: 10.5.0.10
+  node2:
+    container_name: node2
+    build: .
+    restart: always
+    working_dir: $PWD
+    command: sleep 24h
+    volumes:
+      - .:$PWD
+    networks:
+      vpcbr:
+        ipv4_address: 10.5.0.11
+  node3:
+    container_name: node3
+    build: .
+    restart: always
+    working_dir: $PWD
+    command: sleep 24h
+    volumes:
+      - .:$PWD
+    networks:
+      vpcbr:
+        ipv4_address: 10.5.0.12
+  node4:
+    container_name: node4
+    build: .
+    restart: always
+    working_dir: $PWD
+    volumes:
+      - .:$PWD
+    command: sleep 24h
+    networks:
+      vpcbr:
+        ipv4_address: 10.5.0.13
+
+networks:
+  vpcbr:
+    driver: bridge
+    ipam:
+     config:
+       - subnet: 10.5.0.0/16
+         gateway: 10.5.0.1

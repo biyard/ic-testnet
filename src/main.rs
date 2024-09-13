@@ -3,16 +3,10 @@ use clap::Parser;
 use ic_config::embedders::FeatureFlags;
 use ic_config::flag_status::FlagStatus;
 use ic_config::{
-    adapters::AdaptersConfig,
-    artifact_pool::ArtifactPoolTomlConfig,
-    crypto::CryptoConfig,
-    http_handler::Config as HttpHandlerConfig,
-    logger::Config as LoggerConfig,
-    metrics::{Config as MetricsConfig, Exporter},
-    registry_client::Config as RegistryClientConfig,
-    state_manager::Config as StateManagerConfig,
-    transport::TransportConfig,
-    ConfigOptional as ReplicaConfig,
+    adapters::AdaptersConfig, artifact_pool::ArtifactPoolTomlConfig, crypto::CryptoConfig,
+    http_handler::Config as HttpHandlerConfig, logger::Config as LoggerConfig,
+    registry_client::Config as RegistryClientConfig, state_manager::Config as StateManagerConfig,
+    transport::TransportConfig, ConfigOptional as ReplicaConfig,
 };
 use ic_config::{
     embedders::Config as EmbeddersConfig, execution_environment::Config as HypervisorConfig,
@@ -32,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     net::SocketAddr,
-    net::{IpAddr, Ipv4Addr, SocketAddrV4},
+    net::{IpAddr, Ipv4Addr},
     time::Duration,
 };
 use std::{env, fs};
@@ -50,7 +44,8 @@ fn write_replica_config(args: CliArgs, node_index: NodeIndex) -> Result<Validate
     let (log, _async_log_guard) = new_replica_logger_from_config(&logger_config);
 
     info!(log, "ic-starter. Configuration: {:?}", config);
-    let config_path = config.state_dir.join(format!("ic.json5", node_index));
+
+    let config_path = config.state_dir.join(format!("ic-{}.json5", node_index));
 
     info!(log, "Initialize replica configuration {:?}", config_path);
 
@@ -69,28 +64,41 @@ fn write_replica_config(args: CliArgs, node_index: NodeIndex) -> Result<Validate
 }
 
 fn main() -> Result<()> {
-    let args = CliArgs::parse();
-    let ports = [8080, 8081, 8082, 8083];
-    let addrs = ports
-        .iter()
-        .map(|port| SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), *port))
-        .collect::<Vec<_>>();
+    let mut args = CliArgs::parse();
+    args.provisional_whitelist = Some("*".to_string());
+    args.use_specified_ids_allocation_range = true;
+    args.subnet_type = Some("application".to_string());
+    let bindings = [
+        ("127.0.0.1:8080", "127.0.0.1:8081"),
+        ("127.0.0.1:9080", "127.0.0.1:9081"),
+        // ("127.0.0.1:10080", "127.0.0.1:10081"),
+        // ("127.0.0.1:11080", "127.0.0.1:11081"),
+    ];
+
+    // let bindings = [
+    //     ("10.5.0.10:8080", "10.5.0.10:8081"),
+    //     ("10.5.0.11:8080", "10.5.0.11:8081"),
+    //     ("10.5.0.12:8080", "10.5.0.12:8081"),
+    //     ("10.5.0.13:8080", "10.5.0.13:8081"),
+    // ];
     let mut subnet_nodes: BTreeMap<NodeIndex, NodeConfiguration> = BTreeMap::new();
     let mut configs = vec![];
 
-    for (i, addr) in addrs.iter().enumerate() {
+    for (i, binding) in bindings.iter().enumerate() {
         let args = CliArgs {
-            http_listen_addr: Some(*addr),
+            http_listen_addr: Some(binding.0.parse().unwrap()),
             http_port_file: None,
+            canister_http_uds_path: Some(format!("tmp/ic-canister-http-adapter-{i}.sock").into()),
             ..args.clone()
         };
         let node_index = NODE_INDEX + i as NodeIndex;
+
         let config = write_replica_config(args, node_index)?;
 
         subnet_nodes.insert(
             node_index,
             NodeConfiguration {
-                xnet_api: SocketAddr::from_str("127.0.0.1:0").unwrap(),
+                xnet_api: SocketAddr::from_str(binding.1).unwrap(),
                 public_api: config.http_listen_addr,
                 node_operator_principal_id: None,
                 secret_key_store: None,
@@ -99,57 +107,57 @@ fn main() -> Result<()> {
         configs.push(config);
     }
 
-    for config in configs {
-        let mut topology_config = TopologyConfig::default();
-        topology_config.insert_subnet(
+    let config = configs.first().unwrap();
+
+    let mut topology_config = TopologyConfig::default();
+    topology_config.insert_subnet(
+        SUBNET_ID,
+        SubnetConfig::new(
             SUBNET_ID,
-            SubnetConfig::new(
-                SUBNET_ID,
-                subnet_nodes.clone(),
-                config.replica_version.clone(),
-                None,
-                None,
-                None,
-                config.unit_delay,
-                config.initial_notary_delay,
-                config.dkg_interval_length,
-                None,
-                config.subnet_type,
-                None,
-                None,
-                None,
-                Some(config.subnet_features),
-                None, // chain_key_config,
-                None,
-                vec![],
-                vec![],
-                SubnetRunningState::default(),
-                None,
-            ),
-        );
-
-        // N.B. it is safe to generate subnet records here, we only skip this
-        // step for a specific deployment case in ic-prep: when we want to deploy
-        // nodes without assigning them to subnets
-
-        let mut ic_config = IcConfig::new(
-            /* target_dir= */ config.state_dir.as_path(),
-            topology_config,
+            subnet_nodes.clone(),
             config.replica_version.clone(),
-            /* generate_subnet_records= */ true, // see note above
-            /* nns_subnet_index= */ Some(0),
-            /* release_package_url= */ None,
-            /* release_package_sha256_hex */ None,
-            config.provisional_whitelist,
             None,
             None,
-            /* ssh_readonly_access_to_unassigned_nodes */ vec![],
-        );
+            None,
+            config.unit_delay,
+            config.initial_notary_delay,
+            config.dkg_interval_length,
+            None,
+            config.subnet_type,
+            None,
+            None,
+            None,
+            Some(config.subnet_features),
+            None, // chain_key_config,
+            None,
+            vec![],
+            vec![],
+            SubnetRunningState::default(),
+            None,
+        ),
+    );
 
-        ic_config.set_use_specified_ids_allocation_range(config.use_specified_ids_allocation_range);
+    // N.B. it is safe to generate subnet records here, we only skip this
+    // step for a specific deployment case in ic-prep: when we want to deploy
+    // nodes without assigning them to subnets
 
-        ic_config.initialize()?;
-    }
+    let mut ic_config = IcConfig::new(
+        /* target_dir= */ config.state_dir.as_path(),
+        topology_config,
+        config.replica_version.clone(),
+        /* generate_subnet_records= */ true, // see note above
+        /* nns_subnet_index= */ Some(0),
+        /* release_package_url= */ None,
+        /* release_package_sha256_hex */ None,
+        Some(ProvisionalWhitelist::All),
+        None,
+        None,
+        /* ssh_readonly_access_to_unassigned_nodes */ vec![],
+    );
+
+    ic_config.set_use_specified_ids_allocation_range(config.use_specified_ids_allocation_range);
+
+    ic_config.initialize()?;
 
     Ok(())
 }
@@ -227,14 +235,13 @@ struct CliArgs {
                 ignore_case = true)]
     log_level: Option<String>,
 
-    /// Metrics port. Default is None, i.e. periodically dump metrics on stdout.
-    #[clap(long = "metrics-port")]
-    metrics_port: Option<u16>,
+    // /// Metrics port. Default is None, i.e. periodically dump metrics on stdout.
+    // #[clap(long = "metrics-port")]
+    // metrics_port: Option<u16>,
 
-    /// Metrics address. Use this in preference to metrics-port
-    #[clap(long = "metrics-addr")]
-    metrics_addr: Option<SocketAddr>,
-
+    // /// Metrics address. Use this in preference to metrics-port
+    // #[clap(long = "metrics-addr")]
+    // metrics_addr: Option<SocketAddr>,
     /// Unit delay for blockmaker (in milliseconds).
     /// If running integration tests locally (e.g. ic-ref-test),
     /// setting this to 100ms results in faster execution (and higher
@@ -307,7 +314,7 @@ struct CliArgs {
 impl CliArgs {
     fn validate(self, node_index: NodeIndex) -> io::Result<ValidatedConfig> {
         let replica_version = ReplicaVersion::default();
-        let mut state_dir = env::current_dir()?;
+        let mut state_dir = env::current_dir()?; // PathBuf::from("/workdir");
         state_dir.push("tmp");
         state_dir.push(format!("state-{}", node_index));
 
@@ -367,60 +374,44 @@ impl CliArgs {
             }
         }
 
-        let metrics_port = self.metrics_port;
-        let mut metrics_addr = self.metrics_addr;
+        // let metrics_port = self.metrics_port;
+        // let mut metrics_addr = self.metrics_addr;
 
-        if metrics_addr.is_some() && metrics_port.is_some() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "can't pass --metrics-addr and --metrics-port at the same time",
-            ));
-        }
+        // if metrics_addr.is_some() && metrics_port.is_some() {
+        //     return Err(io::Error::new(
+        //         io::ErrorKind::InvalidInput,
+        //         "can't pass --metrics-addr and --metrics-port at the same time",
+        //     ));
+        // }
 
-        if let Some(port) = metrics_port {
-            println!("--metrics-port is deprecated, use --metrics-addr instead");
-            // If only --metrics-port is given then fallback to previous behaviour
-            // of listening on 0.0.0.0. Note that this will trigger warning
-            // popups on macOS.
-            metrics_addr =
-                Some(SocketAddrV4::new("0.0.0.0".parse().expect("can't fail"), port).into());
-        }
+        // if let Some(port) = metrics_port {
+        //     println!("--metrics-port is deprecated, use --metrics-addr instead");
+        //     // If only --metrics-port is given then fallback to previous behaviour
+        //     // of listening on 0.0.0.0. Note that this will trigger warning
+        //     // popups on macOS.
+        //     metrics_addr =
+        //         Some(SocketAddrV4::new("0.0.0.0".parse().expect("can't fail"), port).into());
+        // }
 
-        let log_level = match self.log_level {
-            Some(log_level) => match log_level.to_lowercase().as_str() {
-                // According to the principle of least surprise, accept also a
-                // few alternative log level names
-                "critical" => ic_config::logger::Level::Critical,
-                "error" => ic_config::logger::Level::Error,
-                "warning" => ic_config::logger::Level::Warning,
-                "info" => ic_config::logger::Level::Info,
-                "debug" => ic_config::logger::Level::Debug,
-                "trace" => ic_config::logger::Level::Trace,
-                _ => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        format!("Invalid Log level provided: {}", log_level),
-                    ))
-                }
-            },
-            None => ic_config::logger::Level::Warning,
-        };
+        let log_level = ic_config::logger::Level::Trace;
 
         let artifact_pool_dir = node_dir.join("ic_consensus_pool");
         let crypto_root = node_dir.join("crypto");
         let state_manager_root = node_dir.join("state");
         let registry_local_store_path = state_dir.join("ic_registry_local_store");
 
-        let provisional_whitelist = match self.provisional_whitelist.unwrap_or_default().as_str() {
-            "*" => Some(ProvisionalWhitelist::All),
-            "" => None,
-            _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Whitelist can only be '*' or ''".to_string(),
-                ))
-            }
-        };
+        let provisional_whitelist = Some(ProvisionalWhitelist::All);
+
+        //     match self.provisional_whitelist.unwrap_or_default().as_str() {
+        //     "*" => Some(ProvisionalWhitelist::All),
+        //     "" => None,
+        //     _ => {
+        //         return Err(io::Error::new(
+        //             io::ErrorKind::InvalidInput,
+        //             "Whitelist can only be '*' or ''".to_string(),
+        //         ))
+        //     }
+        // };
 
         let unit_delay = self.unit_delay_millis.map(Duration::from_millis);
         let initial_notary_delay = self.initial_notary_delay_millis.map(Duration::from_millis);
@@ -470,7 +461,7 @@ impl CliArgs {
             state_dir,
             http_listen_addr,
             http_port_file,
-            metrics_addr,
+            // metrics_addr,
             provisional_whitelist,
             artifact_pool_dir,
             crypto_root,
@@ -507,7 +498,6 @@ struct ValidatedConfig {
     state_dir: PathBuf,
     http_listen_addr: SocketAddr,
     http_port_file: Option<PathBuf>,
-    metrics_addr: Option<SocketAddr>,
     provisional_whitelist: Option<ProvisionalWhitelist>,
     artifact_pool_dir: PathBuf,
     crypto_root: PathBuf,
@@ -533,10 +523,6 @@ impl ValidatedConfig {
             port_file_path: self.http_port_file.clone(),
             ..Default::default()
         });
-        let metrics = self.metrics_addr.map(|metrics_addr| MetricsConfig {
-            exporter: Exporter::Http(metrics_addr),
-            ..Default::default()
-        });
 
         let mut artifact_pool_cfg =
             ArtifactPoolTomlConfig::new(self.artifact_pool_dir.clone(), None);
@@ -551,7 +537,7 @@ impl ValidatedConfig {
             local_store: self.registry_local_store_path.clone(),
         });
         let logger_config = LoggerConfig {
-            level: self.log_level,
+            level: ic_config::logger::Level::Info,
             ..LoggerConfig::default()
         };
         let logger = Some(logger_config);
@@ -577,7 +563,7 @@ impl ValidatedConfig {
             state_manager,
             hypervisor,
             http_handler,
-            metrics,
+            metrics: None,
             artifact_pool,
             crypto,
             logger,

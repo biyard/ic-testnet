@@ -11,8 +11,13 @@
 
 ** Running replica
 #+begin_src sh
-  cd ic
-  cargo run --bin ic-replica -- --config-file ../tmp/state-100/ic.json5
+  mkdir logs
+  cd ic && cargo build --bin replica && cd ..
+  alias replica="ic/target/debug/replica --replica-version 0.9.0"
+  replica --config-file tmp/state-100/ic.json5 > logs/node-100.log &
+  replica --config-file tmp/state-101/ic.json5 > logs/node-101.log &
+  replica --config-file tmp/state-102/ic.json5 > logs/node-102.log &
+  replica --config-file tmp/state-103/ic.json5 > logs/node-103.log &
 #+end_src
 
 * Replica version
