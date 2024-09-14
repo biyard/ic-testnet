@@ -7,12 +7,18 @@ setup:
 ic/target/release/replica:
 	cd ic && cargo build --bin replica --release
 
-run: build-deps clean ic/target/release/replica tmp
+run: build-deps clean ic/target/release/replica tmp start
+
+start: 
 	mkdir -p logs
 	ic/target/release/replica --replica-version $(REPLICA_VERSION) --config-file $(BASE_DIR)/ic-100.json5 > logs/node-100.log &
 	ic/target/release/replica --replica-version $(REPLICA_VERSION) --config-file $(BASE_DIR)/ic-101.json5 > logs/node-101.log &
 	ic/target/release/replica --replica-version $(REPLICA_VERSION) --config-file $(BASE_DIR)/ic-102.json5 > logs/node-102.log &
 	ic/target/release/replica --replica-version $(REPLICA_VERSION) --config-file $(BASE_DIR)/ic-103.json5 > logs/node-103.log &
+
+start.%: 
+	cp -rf $(BASE_DIR)/state-100 $(BASE_DIR)/state-$*
+	ic/target/release/replica --replica-version $(REPLICA_VERSION) --config-file $(BASE_DIR)/ic-$*.json5 > logs/node-$*.log &
 
 run-nodes:
 	docker exec node1 ic/target/release/replica --replica-version 0.9.0 --config-file tmp/state-100/ic.json5
