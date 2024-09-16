@@ -55,12 +55,21 @@ fn write_replica_config(node_index: NodeIndex, addr: SocketAddr) -> Result<()> {
     Ok(())
 }
 
+// use ic_system_test_driver::driver::ic::{InternetComputer, Subnet};
+
+// /// The following setup function demonstrates how to create more than one
+// /// Internet Computer instances within a setup function.
+// pub fn setup_two_ics() {
+//     let mut ic = InternetComputer::new().add_subnet(Subnet::new(SubnetType::System).add_nodes(4));
+//     setup_and_start(&mut ic, &test_env).expect("Could not start no-name IC");
+// }
+
 fn main() -> Result<()> {
     let bindings = [
-        ("127.0.0.1:8080", "127.0.0.1:8081", Some(0)),
-        ("127.0.0.1:9080", "127.0.0.1:9081", Some(1)),
-        ("127.0.0.1:10080", "127.0.0.1:10081", Some(1)),
-        ("127.0.0.1:11080", "127.0.0.1:11081", Some(1)),
+        ("127.0.1.1:4100", "127.0.1.1:0", Some(0)),
+        ("127.0.2.1:4100", "127.0.2.1:0", Some(1)),
+        ("127.0.3.1:4100", "127.0.3.1:0", Some(1)),
+        ("127.0.4.1:4100", "127.0.4.1:0", Some(1)),
     ];
 
     let mut unassinged_nodes: BTreeMap<NodeIndex, NodeConfiguration> = BTreeMap::new();
@@ -137,7 +146,7 @@ fn main() -> Result<()> {
                 vec![],
                 vec![],
                 SubnetRunningState::default(),
-                None,
+                Some(1),
             ),
         );
     }
