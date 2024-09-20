@@ -218,7 +218,7 @@ fn build_replica_config(
 
     let transport = Some(TransportConfig {
         node_ip: "0.0.0.0".to_string(),
-        listening_port: 0,
+        listening_port: 4100,
         send_queue_size: 1024,
         ..Default::default()
     });
