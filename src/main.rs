@@ -42,12 +42,7 @@ fn write_replica_config(node_index: NodeIndex, addr: SocketAddr) -> Result<()> {
 
     info!(log, "Initialize replica configuration {:?}", config_path);
 
-    let mut replica_config = build_replica_config(node_index, addr)?;
-    replica_config
-        .hypervisor
-        .as_mut()
-        .unwrap()
-        .deterministic_time_slicing = FlagStatus::Disabled;
+    let replica_config = build_replica_config(node_index, addr)?;
 
     // assemble config
     let config_json = serde_json::to_string(&replica_config)?;
@@ -65,12 +60,19 @@ fn write_replica_config(node_index: NodeIndex, addr: SocketAddr) -> Result<()> {
 // }
 
 fn main() -> Result<()> {
+    // let bindings = [
+    //     ("127.0.1.1:4100", "127.0.1.1:4101", Some(0)),
+    //     ("127.0.2.1:4100", "127.0.2.1:4101", Some(0)),
+    //     ("127.0.3.1:4100", "127.0.3.1:4101", Some(0)),
+    //     ("127.0.4.1:4100", "127.0.4.1:4101", Some(0)),
+    //     // ("127.0.5.1:4100", "127.0.5.1:4101", Some(1)),
+    // ];
+
     let bindings = [
-        ("127.0.1.1:4100", "127.0.1.1:4101", Some(0)),
-        ("127.0.2.1:4100", "127.0.2.1:4101", Some(1)),
-        ("127.0.3.1:4100", "127.0.3.1:4101", Some(1)),
-        ("127.0.4.1:4100", "127.0.4.1:4101", Some(1)),
-        ("127.0.5.1:4100", "127.0.5.1:4101", Some(1)),
+        ("10.5.0.10:4100", "10.5.0.10:4101", Some(0)),
+        ("10.5.0.11:4100", "10.5.0.11:4101", Some(0)),
+        ("10.5.0.12:4100", "10.5.0.12:4101", Some(0)),
+        ("10.5.0.13:4100", "10.5.0.13:4101", Some(0)),
     ];
 
     let mut unassinged_nodes: BTreeMap<NodeIndex, NodeConfiguration> = BTreeMap::new();
@@ -135,7 +137,7 @@ fn main() -> Result<()> {
                 None, // config.dkg_interval_length,
                 None,
                 match subnet_id {
-                    0 => SubnetType::System,
+                    // 0 => SubnetType::System,
                     _ => SubnetType::Application,
                 },
                 None,
@@ -170,7 +172,7 @@ fn main() -> Result<()> {
         /* ssh_readonly_access_to_unassigned_nodes */ vec![],
     );
 
-    ic_config.set_use_specified_ids_allocation_range(true);
+    ic_config.set_use_specified_ids_allocation_range(false);
 
     ic_config.initialize()?;
 
@@ -209,7 +211,7 @@ fn build_replica_config(
         local_store: registry_local_store_path.clone(),
     });
     let logger_config = LoggerConfig {
-        level: ic_config::logger::Level::Trace,
+        level: ic_config::logger::Level::Info,
         ..LoggerConfig::default()
     };
     let logger = Some(logger_config);
@@ -224,6 +226,7 @@ fn build_replica_config(
     let hypervisor = Some(HypervisorConfig {
         canister_sandboxing_flag: FlagStatus::Disabled,
         deterministic_time_slicing: FlagStatus::Disabled,
+        create_funds_whitelist: "*".to_string(),
 
         embedders_config: EmbeddersConfig {
             feature_flags: FeatureFlags {
@@ -242,7 +245,7 @@ fn build_replica_config(
     });
 
     let adapters_config = Some(AdaptersConfig {
-        https_outcalls_uds_path: None,
+        https_outcalls_uds_path: Some(node_dir.join("https_outcalls")),
         ..AdaptersConfig::default()
     });
 

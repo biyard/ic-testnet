@@ -6,7 +6,7 @@ services:
     build: .
     restart: always
     working_dir: $PWD
-    command: sleep 24h
+    command: bash -c "./docker-entry.sh 100"
     volumes:
       - .:$PWD
     networks:
@@ -17,7 +17,7 @@ services:
     build: .
     restart: always
     working_dir: $PWD
-    command: sleep 24h
+    command: bash -c "./docker-entry.sh 101"
     volumes:
       - .:$PWD
     networks:
@@ -28,7 +28,7 @@ services:
     build: .
     restart: always
     working_dir: $PWD
-    command: sleep 24h
+    command: bash -c "./docker-entry.sh 102"
     volumes:
       - .:$PWD
     networks:
@@ -41,7 +41,7 @@ services:
     working_dir: $PWD
     volumes:
       - .:$PWD
-    command: sleep 24h
+    command: bash -c "./docker-entry.sh 103"
     networks:
       vpcbr:
         ipv4_address: 10.5.0.13
