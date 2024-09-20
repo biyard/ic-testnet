@@ -66,10 +66,11 @@ fn write_replica_config(node_index: NodeIndex, addr: SocketAddr) -> Result<()> {
 
 fn main() -> Result<()> {
     let bindings = [
-        ("127.0.1.1:4100", "127.0.1.1:0", Some(0)),
-        ("127.0.2.1:4100", "127.0.2.1:0", Some(1)),
-        ("127.0.3.1:4100", "127.0.3.1:0", Some(1)),
-        ("127.0.4.1:4100", "127.0.4.1:0", Some(1)),
+        ("127.0.1.1:4100", "127.0.1.1:4101", Some(0)),
+        ("127.0.2.1:4100", "127.0.2.1:4101", Some(1)),
+        ("127.0.3.1:4100", "127.0.3.1:4101", Some(1)),
+        ("127.0.4.1:4100", "127.0.4.1:4101", Some(1)),
+        ("127.0.5.1:4100", "127.0.5.1:4101", Some(1)),
     ];
 
     let mut unassinged_nodes: BTreeMap<NodeIndex, NodeConfiguration> = BTreeMap::new();
@@ -146,7 +147,7 @@ fn main() -> Result<()> {
                 vec![],
                 vec![],
                 SubnetRunningState::default(),
-                Some(1),
+                Some(0),
             ),
         );
     }
