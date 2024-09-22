@@ -21,7 +21,7 @@ use ic_prep_lib::{
 use ic_registry_provisional_whitelist::ProvisionalWhitelist;
 use ic_registry_subnet_features::SubnetFeatures;
 use ic_registry_subnet_type::SubnetType;
-use ic_types::ReplicaVersion;
+use ic_types::{Cycles, ReplicaVersion};
 use std::path::PathBuf;
 use std::{collections::BTreeMap, net::SocketAddr};
 use std::{env, fs};
@@ -241,6 +241,8 @@ fn build_replica_config(
         rate_limiting_of_instructions: FlagStatus::Disabled,
         canister_snapshots: FlagStatus::Enabled,
         query_stats_epoch_length: 60,
+        default_provisional_cycles_balance: Cycles::new(18_446_744_073_709_551_616),
+
         ..HypervisorConfig::default()
     });
 
