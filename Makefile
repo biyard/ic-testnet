@@ -1,5 +1,5 @@
-REPLICA_VERSION = 0.9.0
-BASE_DIR = $(shell pwd)/tmp
+REPLICA_VERSION ?= 0.9.0
+BASE_DIR ?= $(shell pwd)/tmp
 ENV ?= default
 
 setup:
@@ -42,6 +42,7 @@ run-nodes:
 	docker exec node1 ic/target/debug/replica --replica-version 0.9.0 --config-file tmp/state-100/ic.json5
 
 tmp:
+	mkdir -p tmp
 	BASE_DIR=$(BASE_DIR) cargo run --features $(ENV) --
 	cp -rf $(BASE_DIR)/state $(BASE_DIR)/state-100
 	cp -rf $(BASE_DIR)/state $(BASE_DIR)/state-101

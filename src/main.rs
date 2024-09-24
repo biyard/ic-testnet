@@ -71,7 +71,7 @@ fn main() -> Result<()> {
     #[cfg(feature = "aws")]
     let bindings = [("10.1.65.92:4100", "10.1.65.92:4101", Some(0))];
 
-    #[cfg(not(and(feature = "local", feature = "aws")))]
+    #[cfg(all(not(feature = "local"), not(feature = "aws")))]
     let bindings = [
         ("10.5.0.10:4100", "10.5.0.10:4101", Some(0)),
         ("10.5.0.11:4100", "10.5.0.11:4101", Some(0)),
@@ -80,10 +80,8 @@ fn main() -> Result<()> {
     ];
 
     let mut unassinged_nodes: BTreeMap<NodeIndex, NodeConfiguration> = BTreeMap::new();
-    let mut state_dir = match env::var("BASE_DIR") {
-        Ok(dir) => PathBuf::from(dir),
-        _ => env::current_dir()?,
-    };
+    let mut state_dir = env::current_dir()?;
+    state_dir.push(format!("tmp"));
     state_dir.push(format!("state"));
 
     if !state_dir.is_dir() {
