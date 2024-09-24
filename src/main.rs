@@ -70,9 +70,9 @@ fn main() -> Result<()> {
 
     let bindings = [
         ("10.5.0.10:4100", "10.5.0.10:4101", Some(0)),
-        ("10.5.0.11:4100", "10.5.0.11:4101", Some(0)),
-        ("10.5.0.12:4100", "10.5.0.12:4101", Some(0)),
-        ("10.5.0.13:4100", "10.5.0.13:4101", Some(0)),
+        // ("10.5.0.11:4100", "10.5.0.11:4101", Some(0)),
+        // ("10.5.0.12:4100", "10.5.0.12:4101", Some(0)),
+        // ("10.5.0.13:4100", "10.5.0.13:4101", Some(0)),
     ];
 
     let mut unassinged_nodes: BTreeMap<NodeIndex, NodeConfiguration> = BTreeMap::new();
@@ -198,6 +198,14 @@ fn build_replica_config(
     let state_manager = Some(StateManagerConfig::new(state_manager_root.clone()));
     let http_handler = Some(HttpHandlerConfig {
         listen_addr: http_listen_addr,
+        http_max_concurrent_streams: 10000,
+        max_read_state_concurrent_requests: 2000,
+        max_status_concurrent_requests: 2000,
+        max_catch_up_package_concurrent_requests: 2000,
+        max_dashboard_concurrent_requests: 100,
+        max_call_concurrent_requests: 2000,
+        max_query_concurrent_requests: 5000,
+        max_pprof_concurrent_requests: 5,
         ..Default::default()
     });
 

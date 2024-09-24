@@ -15,7 +15,6 @@ services:
   node2:
     container_name: node2
     build: .
-    restart: always
     working_dir: $PWD
     command: bash -c "./docker-entry.sh 101"
     volumes:
@@ -26,7 +25,6 @@ services:
   node3:
     container_name: node3
     build: .
-    restart: always
     working_dir: $PWD
     command: bash -c "./docker-entry.sh 102"
     volumes:
@@ -37,7 +35,6 @@ services:
   node4:
     container_name: node4
     build: .
-    restart: always
     working_dir: $PWD
     volumes:
       - .:$PWD
