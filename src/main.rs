@@ -35,7 +35,7 @@ fn write_replica_config(node_index: NodeIndex, addr: SocketAddr) -> Result<()> {
         ..LoggerConfig::default()
     };
     let (log, _async_log_guard) = new_replica_logger_from_config(&logger_config);
-    let mut node_dir = env::current_dir()?; // PathBuf::from("/workdir");
+    let mut node_dir = env::current_dir()?;
     node_dir.push("tmp");
 
     let config_path = node_dir.join(format!("ic-{}.json5", node_index));
@@ -50,34 +50,17 @@ fn write_replica_config(node_index: NodeIndex, addr: SocketAddr) -> Result<()> {
     Ok(())
 }
 
-// use ic_system_test_driver::driver::ic::{InternetComputer, Subnet};
-
-// /// The following setup function demonstrates how to create more than one
-// /// Internet Computer instances within a setup function.
-// pub fn setup_two_ics() {
-//     let mut ic = InternetComputer::new().add_subnet(Subnet::new(SubnetType::System).add_nodes(4));
-//     setup_and_start(&mut ic, &test_env).expect("Could not start no-name IC");
-// }
-
 fn main() -> Result<()> {
-    #[cfg(feature = "local")]
-    let bindings = [
-        ("127.0.1.1:4100", "127.0.1.1:4101", Some(0)),
-        ("127.0.2.1:4100", "127.0.2.1:4101", Some(0)),
-        ("127.0.3.1:4100", "127.0.3.1:4101", Some(0)),
-        ("127.0.4.1:4100", "127.0.4.1:4101", Some(0)),
-    ];
+    let nodes: Vec<String> = option_env!("NODES")
+        .unwrap_or("10.5.0.10 10.5.0.11 10.5.0.12 10.5.0.13")
+        .split(" ")
+        .map(|s| s.to_string())
+        .collect();
 
-    #[cfg(feature = "aws")]
-    let bindings = [("10.1.65.92:4100", "10.1.65.92:4101", Some(0))];
-
-    #[cfg(all(not(feature = "local"), not(feature = "aws")))]
-    let bindings = [
-        ("10.5.0.10:4100", "10.5.0.10:4101", Some(0)),
-        ("10.5.0.11:4100", "10.5.0.11:4101", Some(0)),
-        ("10.5.0.12:4100", "10.5.0.12:4101", Some(0)),
-        ("10.5.0.13:4100", "10.5.0.13:4101", Some(0)),
-    ];
+    let bindings: Vec<(String, String, Option<u64>)> = nodes
+        .iter()
+        .map(|node| (format!("{}:4100", node), format!("{}:4101", node), Some(0)))
+        .collect::<Vec<_>>();
 
     let mut unassinged_nodes: BTreeMap<NodeIndex, NodeConfiguration> = BTreeMap::new();
     let mut state_dir = env::current_dir()?;
@@ -102,7 +85,7 @@ fn main() -> Result<()> {
                 subnet.insert(
                     node_index,
                     NodeConfiguration {
-                        xnet_api: SocketAddr::from_str(binding.1).unwrap(),
+                        xnet_api: SocketAddr::from_str(&binding.1).unwrap(),
                         public_api: addr,
                         node_operator_principal_id: None,
                         secret_key_store: None,
@@ -113,7 +96,7 @@ fn main() -> Result<()> {
                 unassinged_nodes.insert(
                     node_index,
                     NodeConfiguration {
-                        xnet_api: SocketAddr::from_str(binding.1).unwrap(),
+                        xnet_api: SocketAddr::from_str(&binding.1).unwrap(),
                         public_api: addr,
                         node_operator_principal_id: None,
                         secret_key_store: None,

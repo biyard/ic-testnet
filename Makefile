@@ -5,6 +5,9 @@ ENV ?= default
 setup:
 	yay -S gnu-netcat
 
+ic/target/release/replica:
+	cd ic && cargo build --bin replica --release
+
 ic/target/debug/replica:
 	cd ic && cargo build --bin replica
 
@@ -43,11 +46,11 @@ run-nodes:
 
 tmp:
 	mkdir -p tmp
-	BASE_DIR=$(BASE_DIR) cargo run --features $(ENV) --
-	cp -rf $(BASE_DIR)/state $(BASE_DIR)/state-100
-	cp -rf $(BASE_DIR)/state $(BASE_DIR)/state-101
-	cp -rf $(BASE_DIR)/state $(BASE_DIR)/state-102
-	cp -rf $(BASE_DIR)/state $(BASE_DIR)/state-103
+	BASE_DIR=$(BASE_DIR) cargo run --
+	cp -rf tmp/state tmp/state-100
+	cp -rf tmp/state tmp/state-101
+	cp -rf tmp/state tmp/state-102
+	cp -rf tmp/state tmp/state-103
 
 clean:
 	rm -rf tmp logs
