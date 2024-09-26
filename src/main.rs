@@ -12,7 +12,7 @@ use ic_config::{
     embedders::Config as EmbeddersConfig, execution_environment::Config as HypervisorConfig,
 };
 use ic_logger::{info, new_replica_logger_from_config};
-use ic_prep_lib::subnet_configuration::SubnetIndex;
+use ic_prep_lib::subnet_configuration::{constants, SubnetIndex};
 use ic_prep_lib::{
     internet_computer::{IcConfig, TopologyConfig},
     node::{NodeConfiguration, NodeIndex},
@@ -115,11 +115,11 @@ fn main() -> Result<()> {
                 subnet_nodes.clone(),
                 ReplicaVersion::default(),
                 None,
-                None,
-                None,
-                None, //config.unit_delay,
-                None, // config.initial_notary_delay,
-                None, // config.dkg_interval_length,
+                Some(5000), // max_ingress_messages_per_block
+                Some(constants::MAX_BLOCK_PAYLOAD_SIZE * 5), //max_block_payload_size 5 * 4MB
+                None,       //config.unit_delay,
+                None,       // config.initial_notary_delay,
+                None,       // config.dkg_interval_length,
                 None,
                 match subnet_id {
                     // 0 => SubnetType::System,
@@ -188,7 +188,7 @@ fn build_replica_config(
         max_status_concurrent_requests: 2000,
         max_catch_up_package_concurrent_requests: 2000,
         max_dashboard_concurrent_requests: 100,
-        max_call_concurrent_requests: 2000,
+        max_call_concurrent_requests: 5000,
         max_query_concurrent_requests: 5000,
         max_pprof_concurrent_requests: 5,
         ..Default::default()
