@@ -22,6 +22,7 @@ use ic_registry_provisional_whitelist::ProvisionalWhitelist;
 use ic_registry_subnet_features::SubnetFeatures;
 use ic_registry_subnet_type::SubnetType;
 use ic_types::{Cycles, ReplicaVersion};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::{collections::BTreeMap, net::SocketAddr};
 use std::{env, fs};
@@ -51,6 +52,9 @@ fn write_replica_config(node_index: NodeIndex, addr: SocketAddr) -> Result<()> {
 }
 
 fn main() -> Result<()> {
+    let mut node_dir = env::current_dir()?;
+    node_dir.push("tmp");
+
     let nodes: Vec<String> = option_env!("NODES")
         .unwrap_or("10.5.0.10 10.5.0.11 10.5.0.12 10.5.0.13")
         .split(" ")
@@ -108,35 +112,68 @@ fn main() -> Result<()> {
 
     let mut topology_config = TopologyConfig::default();
     for (subnet_id, subnet_nodes) in subnets {
-        topology_config.insert_subnet(
+        let conf = SubnetConfig::new(
             subnet_id,
-            SubnetConfig::new(
-                subnet_id,
-                subnet_nodes.clone(),
-                ReplicaVersion::default(),
-                None,
-                Some(5000), // max_ingress_messages_per_block
-                Some(constants::MAX_BLOCK_PAYLOAD_SIZE * 5), //max_block_payload_size 5 * 4MB
-                None,       //config.unit_delay,
-                None,       // config.initial_notary_delay,
-                None,       // config.dkg_interval_length,
-                None,
-                match subnet_id {
-                    // 0 => SubnetType::System,
-                    _ => SubnetType::Application,
-                },
-                None,
-                None,
-                None,
-                Some(SubnetFeatures::default()),
-                None, // chain_key_config,
-                None,
-                vec![],
-                vec![],
-                SubnetRunningState::default(),
-                Some(0),
-            ),
+            subnet_nodes.clone(),
+            ReplicaVersion::default(),
+            None,
+            Some(5000),                                  // max_ingress_messages_per_block
+            Some(constants::MAX_BLOCK_PAYLOAD_SIZE * 5), //max_block_payload_size 5 * 4MB
+            None,                                        //config.unit_delay,
+            None,                                        // config.initial_notary_delay,
+            None,                                        // config.dkg_interval_length,
+            None,
+            match subnet_id {
+                // 0 => SubnetType::System,
+                _ => SubnetType::Application,
+            },
+            None,
+            None,
+            None,
+            Some(SubnetFeatures::default()),
+            None, // chain_key_config,
+            None,
+            vec![],
+            vec![],
+            SubnetRunningState::default(),
+            Some(0),
         );
+
+        #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+        pub struct SubnetConfigJson {
+            id: u64,
+            nodes: BTreeMap<NodeIndex, NodeConfiguration>,
+            pub max_ingress_bytes_per_message: u64,
+            pub max_ingress_messages_per_block: u64,
+            pub max_block_payload_size: u64,
+            pub max_instructions_per_message: u64,
+            pub max_instructions_per_round: u64,
+            pub max_instructions_per_install_code: u64,
+            pub max_number_of_canisters: u64,
+            pub initial_height: u64,
+        }
+
+        impl From<SubnetConfig> for SubnetConfigJson {
+            fn from(conf: SubnetConfig) -> Self {
+                SubnetConfigJson {
+                    id: conf.subnet_index,
+                    nodes: conf.membership.clone(),
+                    max_ingress_bytes_per_message: conf.max_ingress_bytes_per_message,
+                    max_ingress_messages_per_block: conf.max_ingress_messages_per_block,
+                    max_block_payload_size: conf.max_block_payload_size,
+                    max_instructions_per_message: conf.max_instructions_per_message,
+                    max_instructions_per_round: conf.max_instructions_per_round,
+                    max_instructions_per_install_code: conf.max_instructions_per_install_code,
+                    max_number_of_canisters: conf.max_number_of_canisters,
+                    initial_height: conf.initial_height,
+                }
+            }
+        }
+
+        let config_path = node_dir.join(format!("subnet-{}.json", subnet_id));
+        let config_json = serde_json::to_string(&SubnetConfigJson::from(conf.clone()))?;
+        std::fs::write(config_path.clone(), config_json.into_bytes())?;
+        topology_config.insert_subnet(subnet_id, conf.clone());
     }
 
     for (idx, nc) in unassinged_nodes {
