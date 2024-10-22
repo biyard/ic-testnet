@@ -1,4 +1,5 @@
 use anyhow::Result;
+use ic_config::artifact_pool::LMDBConfig;
 use ic_config::embedders::FeatureFlags;
 use ic_config::flag_status::FlagStatus;
 use ic_config::logger::Level;
@@ -11,13 +12,14 @@ use ic_config::{
 use ic_config::{
     embedders::Config as EmbeddersConfig, execution_environment::Config as HypervisorConfig,
 };
-use ic_logger::{info, new_replica_logger_from_config};
+use ic_logger::{info, new_replica_logger_from_config, no_op_logger};
 use ic_prep_lib::subnet_configuration::{constants, SubnetIndex};
 use ic_prep_lib::{
     internet_computer::{IcConfig, TopologyConfig},
     node::{NodeConfiguration, NodeIndex},
     subnet_configuration::{SubnetConfig, SubnetRunningState},
 };
+use ic_protobuf::types::v1::ConsensusMessage;
 use ic_registry_provisional_whitelist::ProvisionalWhitelist;
 use ic_registry_subnet_features::SubnetFeatures;
 use ic_registry_subnet_type::SubnetType;
@@ -51,152 +53,166 @@ fn write_replica_config(node_index: NodeIndex, addr: SocketAddr) -> Result<()> {
     Ok(())
 }
 
-fn main() -> Result<()> {
-    let mut node_dir = env::current_dir()?;
-    node_dir.push("tmp");
+fn lmdb() {
+    let conf = LMDBConfig {
+        persistent_pool_validated_persistent_db_path: PathBuf::from("/home/hackartist/data/devel/github.com/biyard/ic-testnet/tmp/state-100/node-100/ic_consensus_pool")
+    };
+    let log = no_op_logger();
+    use ic_interfaces::consensus_pool::PoolSection;
 
-    let nodes: Vec<String> = option_env!("NODES")
-        .unwrap_or("10.5.0.10 10.5.0.11 10.5.0.12 10.5.0.13")
-        .split(" ")
-        .map(|s| s.to_string())
-        .collect();
-
-    let bindings: Vec<(String, String, Option<u64>)> = nodes
-        .iter()
-        .map(|node| (format!("{}:4100", node), format!("{}:4101", node), Some(0)))
-        .collect::<Vec<_>>();
-
-    let mut unassinged_nodes: BTreeMap<NodeIndex, NodeConfiguration> = BTreeMap::new();
-    let mut state_dir = env::current_dir()?;
-    state_dir.push(format!("tmp"));
-    state_dir.push(format!("state"));
-
-    if !state_dir.is_dir() {
-        fs::create_dir_all(state_dir.clone())?;
-    }
-
-    let mut subnets: BTreeMap<SubnetIndex, BTreeMap<NodeIndex, NodeConfiguration>> =
-        BTreeMap::new();
-
-    for (i, binding) in bindings.iter().enumerate() {
-        let node_index = NODE_INDEX + i as NodeIndex;
-        let addr = binding.0.parse()?;
-        write_replica_config(node_index, addr)?;
-
-        match binding.2 {
-            Some(subnet_id) => {
-                let subnet = subnets.entry(subnet_id).or_insert(BTreeMap::new());
-                subnet.insert(
-                    node_index,
-                    NodeConfiguration {
-                        xnet_api: SocketAddr::from_str(&binding.1).unwrap(),
-                        public_api: addr,
-                        node_operator_principal_id: None,
-                        secret_key_store: None,
-                    },
-                );
-            }
-            None => {
-                unassinged_nodes.insert(
-                    node_index,
-                    NodeConfiguration {
-                        xnet_api: SocketAddr::from_str(&binding.1).unwrap(),
-                        public_api: addr,
-                        node_operator_principal_id: None,
-                        secret_key_store: None,
-                    },
-                );
-            }
-        }
-    }
-
-    let mut topology_config = TopologyConfig::default();
-    for (subnet_id, subnet_nodes) in subnets {
-        let conf = SubnetConfig::new(
-            subnet_id,
-            subnet_nodes.clone(),
-            ReplicaVersion::default(),
-            None,
-            Some(5000),                                  // max_ingress_messages_per_block
-            Some(constants::MAX_BLOCK_PAYLOAD_SIZE * 5), //max_block_payload_size 5 * 4MB
-            None,                                        //config.unit_delay,
-            None,                                        // config.initial_notary_delay,
-            None,                                        // config.dkg_interval_length,
-            None,
-            match subnet_id {
-                // 0 => SubnetType::System,
-                _ => SubnetType::Application,
-            },
-            None,
-            None,
-            None,
-            Some(SubnetFeatures::default()),
-            None, // chain_key_config,
-            None,
-            vec![],
-            vec![],
-            SubnetRunningState::default(),
-            Some(0),
-        );
-
-        #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-        pub struct SubnetConfigJson {
-            id: u64,
-            nodes: BTreeMap<NodeIndex, NodeConfiguration>,
-            pub max_ingress_bytes_per_message: u64,
-            pub max_ingress_messages_per_block: u64,
-            pub max_block_payload_size: u64,
-            pub max_instructions_per_message: u64,
-            pub max_instructions_per_round: u64,
-            pub max_instructions_per_install_code: u64,
-            pub max_number_of_canisters: u64,
-            pub initial_height: u64,
-        }
-
-        impl From<SubnetConfig> for SubnetConfigJson {
-            fn from(conf: SubnetConfig) -> Self {
-                SubnetConfigJson {
-                    id: conf.subnet_index,
-                    nodes: conf.membership.clone(),
-                    max_ingress_bytes_per_message: conf.max_ingress_bytes_per_message,
-                    max_ingress_messages_per_block: conf.max_ingress_messages_per_block,
-                    max_block_payload_size: conf.max_block_payload_size,
-                    max_instructions_per_message: conf.max_instructions_per_message,
-                    max_instructions_per_round: conf.max_instructions_per_round,
-                    max_instructions_per_install_code: conf.max_instructions_per_install_code,
-                    max_number_of_canisters: conf.max_number_of_canisters,
-                    initial_height: conf.initial_height,
-                }
-            }
-        }
-
-        let config_path = node_dir.join(format!("subnet-{}.json", subnet_id));
-        let config_json = serde_json::to_string(&SubnetConfigJson::from(conf.clone()))?;
-        std::fs::write(config_path.clone(), config_json.into_bytes())?;
-        topology_config.insert_subnet(subnet_id, conf.clone());
-    }
-
-    for (idx, nc) in unassinged_nodes {
-        topology_config.insert_unassigned_node(idx, nc)
-    }
-
-    let mut ic_config = IcConfig::new(
-        /* target_dir= */ state_dir.as_path(),
-        topology_config,
-        ReplicaVersion::default(),
-        /* generate_subnet_records= */ true, // see note above
-        /* nns_subnet_index= */ Some(0),
-        /* release_package_url= */ None,
-        /* release_package_sha256_hex */ None,
-        Some(ProvisionalWhitelist::All),
-        None,
-        None,
-        /* ssh_readonly_access_to_unassigned_nodes */ vec![],
+    let pool = ic_artifact_pool::lmdb_pool::PersistentHeightIndexedPool::new_consensus_pool(
+        conf, true, log,
     );
+    pool.block_proposal().get_by_height(h)
+}
 
-    ic_config.set_use_specified_ids_allocation_range(false);
+fn main() -> Result<()> {
+    lmdb();
+    // let mut node_dir = env::current_dir()?;
+    // node_dir.push("tmp");
 
-    ic_config.initialize()?;
+    // let nodes: Vec<String> = option_env!("NODES")
+    //     .unwrap_or("10.5.0.10 10.5.0.11 10.5.0.12 10.5.0.13")
+    //     .split(" ")
+    //     .map(|s| s.to_string())
+    //     .collect();
+
+    // let bindings: Vec<(String, String, Option<u64>)> = nodes
+    //     .iter()
+    //     .map(|node| (format!("{}:4100", node), format!("{}:4101", node), Some(0)))
+    //     .collect::<Vec<_>>();
+
+    // let mut unassinged_nodes: BTreeMap<NodeIndex, NodeConfiguration> = BTreeMap::new();
+    // let mut state_dir = env::current_dir()?;
+    // state_dir.push(format!("tmp"));
+    // state_dir.push(format!("state"));
+
+    // if !state_dir.is_dir() {
+    //     fs::create_dir_all(state_dir.clone())?;
+    // }
+
+    // let mut subnets: BTreeMap<SubnetIndex, BTreeMap<NodeIndex, NodeConfiguration>> =
+    //     BTreeMap::new();
+
+    // for (i, binding) in bindings.iter().enumerate() {
+    //     let node_index = NODE_INDEX + i as NodeIndex;
+    //     let addr = binding.0.parse()?;
+    //     write_replica_config(node_index, addr)?;
+
+    //     match binding.2 {
+    //         Some(subnet_id) => {
+    //             let subnet = subnets.entry(subnet_id).or_insert(BTreeMap::new());
+    //             subnet.insert(
+    //                 node_index,
+    //                 NodeConfiguration {
+    //                     xnet_api: SocketAddr::from_str(&binding.1).unwrap(),
+    //                     public_api: addr,
+    //                     node_operator_principal_id: None,
+    //                     secret_key_store: None,
+    //                 },
+    //             );
+    //         }
+    //         None => {
+    //             unassinged_nodes.insert(
+    //                 node_index,
+    //                 NodeConfiguration {
+    //                     xnet_api: SocketAddr::from_str(&binding.1).unwrap(),
+    //                     public_api: addr,
+    //                     node_operator_principal_id: None,
+    //                     secret_key_store: None,
+    //                 },
+    //             );
+    //         }
+    //     }
+    // }
+
+    // let mut topology_config = TopologyConfig::default();
+    // for (subnet_id, subnet_nodes) in subnets {
+    //     let conf = SubnetConfig::new(
+    //         subnet_id,
+    //         subnet_nodes.clone(),
+    //         ReplicaVersion::default(),
+    //         None,
+    //         Some(5000),                                  // max_ingress_messages_per_block
+    //         Some(constants::MAX_BLOCK_PAYLOAD_SIZE * 5), //max_block_payload_size 5 * 4MB
+    //         None,                                        //config.unit_delay,
+    //         None,                                        // config.initial_notary_delay,
+    //         None,                                        // config.dkg_interval_length,
+    //         None,
+    //         match subnet_id {
+    //             // 0 => SubnetType::System,
+    //             _ => SubnetType::Application,
+    //         },
+    //         None,
+    //         None,
+    //         None,
+    //         Some(SubnetFeatures::default()),
+    //         None, // chain_key_config,
+    //         None,
+    //         vec![],
+    //         vec![],
+    //         SubnetRunningState::default(),
+    //         Some(0),
+    //     );
+
+    //     #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+    //     pub struct SubnetConfigJson {
+    //         id: u64,
+    //         nodes: BTreeMap<NodeIndex, NodeConfiguration>,
+    //         pub max_ingress_bytes_per_message: u64,
+    //         pub max_ingress_messages_per_block: u64,
+    //         pub max_block_payload_size: u64,
+    //         pub max_instructions_per_message: u64,
+    //         pub max_instructions_per_round: u64,
+    //         pub max_instructions_per_install_code: u64,
+    //         pub max_number_of_canisters: u64,
+    //         pub initial_height: u64,
+    //     }
+
+    //     impl From<SubnetConfig> for SubnetConfigJson {
+    //         fn from(conf: SubnetConfig) -> Self {
+    //             SubnetConfigJson {
+    //                 id: conf.subnet_index,
+    //                 nodes: conf.membership.clone(),
+    //                 max_ingress_bytes_per_message: conf.max_ingress_bytes_per_message,
+    //                 max_ingress_messages_per_block: conf.max_ingress_messages_per_block,
+    //                 max_block_payload_size: conf.max_block_payload_size,
+    //                 max_instructions_per_message: conf.max_instructions_per_message,
+    //                 max_instructions_per_round: conf.max_instructions_per_round,
+    //                 max_instructions_per_install_code: conf.max_instructions_per_install_code,
+    //                 max_number_of_canisters: conf.max_number_of_canisters,
+    //                 initial_height: conf.initial_height,
+    //             }
+    //         }
+    //     }
+
+    //     let config_path = node_dir.join(format!("subnet-{}.json", subnet_id));
+    //     let config_json = serde_json::to_string(&SubnetConfigJson::from(conf.clone()))?;
+    //     std::fs::write(config_path.clone(), config_json.into_bytes())?;
+    //     topology_config.insert_subnet(subnet_id, conf.clone());
+    // }
+
+    // for (idx, nc) in unassinged_nodes {
+    //     topology_config.insert_unassigned_node(idx, nc)
+    // }
+
+    // let mut ic_config = IcConfig::new(
+    //     /* target_dir= */ state_dir.as_path(),
+    //     topology_config,
+    //     ReplicaVersion::default(),
+    //     /* generate_subnet_records= */ true, // see note above
+    //     /* nns_subnet_index= */ Some(0),
+    //     /* release_package_url= */ None,
+    //     /* release_package_sha256_hex */ None,
+    //     Some(ProvisionalWhitelist::All),
+    //     None,
+    //     None,
+    //     /* ssh_readonly_access_to_unassigned_nodes */ vec![],
+    // );
+
+    // ic_config.set_use_specified_ids_allocation_range(false);
+
+    // ic_config.initialize()?;
 
     Ok(())
 }

@@ -1,6 +1,7 @@
 REPLICA_VERSION ?= 0.9.0
 BASE_DIR ?= $(shell pwd)/tmp
 ENV ?= default
+NODES ?= "127.0.1.1 127.0.2.1 127.0.3.1 127.0.4.1"
 
 setup:
 	yay -S gnu-netcat
@@ -11,8 +12,8 @@ ic/target/release/replica:
 ic/target/debug/replica:
 	cd ic && cargo build --bin replica
 
-run: build-deps clean ic/target/debug/replica
-	BASE_DIR=$(BASE_DIR) cargo run --features local --
+run: clean ic/target/debug/replica
+	NODES=$(NODES) BASE_DIR=$(BASE_DIR) cargo run --
 	cp -rf $(BASE_DIR)/state $(BASE_DIR)/state-100
 	cp -rf $(BASE_DIR)/state $(BASE_DIR)/state-101
 	cp -rf $(BASE_DIR)/state $(BASE_DIR)/state-102
