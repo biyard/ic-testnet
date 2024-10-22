@@ -23,7 +23,7 @@ use ic_protobuf::types::v1::ConsensusMessage;
 use ic_registry_provisional_whitelist::ProvisionalWhitelist;
 use ic_registry_subnet_features::SubnetFeatures;
 use ic_registry_subnet_type::SubnetType;
-use ic_types::{Cycles, ReplicaVersion};
+use ic_types::{Cycles, Height, ReplicaVersion};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::{collections::BTreeMap, net::SocketAddr};
@@ -63,7 +63,9 @@ fn lmdb() {
     let pool = ic_artifact_pool::lmdb_pool::PersistentHeightIndexedPool::new_consensus_pool(
         conf, true, log,
     );
-    pool.block_proposal().get_by_height(h)
+
+    let range = pool.block_proposal().height_range().unwrap();
+    println!("{range:?}")
 }
 
 fn main() -> Result<()> {
